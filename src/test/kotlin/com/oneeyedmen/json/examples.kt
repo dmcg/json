@@ -32,6 +32,14 @@ val strings = listOf(
     // TODO("other escapes")
 )
 
+val anEmptyArray = "[]"
+val anotherEmptyArray = "[   ]"
+val anEmptyArrayWithALineBreak = "[\n]"
+val anArrayWithOneItem = "[ \"banana\" ]"
+val anArrayWithOneItemAndNoSpace = "[\"banana\"]"
+val anArrayWithTwoItems = "[ \"banana\", null ]"
+val anArrayWithTwoItemsOneWithComma = "[ \"Hello, World\", null ]"
+
 val anEmptyObject = "{}"
 val anotherEmptyObject = "{  }"
 val anEmptyObjectWithALineBreak = "{\n}"

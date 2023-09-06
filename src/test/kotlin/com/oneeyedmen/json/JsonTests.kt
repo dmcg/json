@@ -64,11 +64,27 @@ class JsonTests {
         expectThat(parse("""""""")).isEqualTo("")
         expectThat(parse("""" """")).isEqualTo(" ")
         expectThat(parse(""""Hello \"world"""")).isEqualTo("Hello \"world")
-        expectThrows<IllegalArgumentException> {  parse(""""banana""") }
+        expectThrows<IllegalArgumentException> { parse(""""banana""") }
 
         strings.forEach {
             expectThat(parse(it)).isA<String>()
         }
+    }
+
+    @Test
+    fun arrays() {
+        expectThat(parse("[]")).isEqualTo(emptyList<Any?>())
+        expectThat(parse(" []")).isEqualTo(emptyList<Any?>())
+        expectThat(parse(" []  ")).isEqualTo(emptyList<Any?>())
+        expectThat(parse("[ ]")).isEqualTo(emptyList<Any?>())
+        expectThat(parse("[\n]")).isEqualTo(emptyList<Any?>())
+        expectThrows<IllegalArgumentException> { parse("[") }
+
+        expectThat(parse("[\"banana\"]")).isEqualTo(listOf("banana"))
+        expectThat(parse("[ null ]")).isEqualTo(listOf(null))
+
+        expectThat(parse("[ \"banana\", null ]")).isEqualTo(listOf("banana", null))
+//        expectThat(parse("[ \"Hello, World\", null ]")).isEqualTo(listOf("Hello, World", null))
     }
 }
 
@@ -78,11 +94,26 @@ fun parse(json: String): Any? {
         trimmed == "null" -> null
         trimmed == "true" -> true
         trimmed == "false" -> false
-        trimmed.startsWith('\"') && trimmed.endsWith('\"') ->
-            trimmed.subSequence(1, trimmed.length - 1).withEscapesExpanded()
-        else -> trimmed.toBigDecimalOrNull() ?: throw IllegalArgumentException("Not valid json <$json>")
+        trimmed.isString() -> parseString(trimmed)
+        trimmed.isArray() -> parseArray(trimmed)
+        else -> trimmed.toBigDecimalOrNull() ?:
+            throw IllegalArgumentException("Not valid json <$json>")
     }
 }
+
+private fun parseString(trimmed: String) = trimmed.subSequence(1, trimmed.length - 1).withEscapesExpanded()
+
+private fun parseArray(trimmed: String): List<Any?> {
+    val content = trimmed.subSequence(1, trimmed.length - 1)
+    return if (content.isBlank()) emptyList<Any?>()
+    else content.toString().split(',').map {
+        parse(it)
+    }
+}
+
+private fun String.isArray() = startsWith('[') && endsWith(']')
+
+private fun String.isString() = startsWith('\"') && endsWith('\"')
 
 private fun CharSequence.withEscapesExpanded(): String =
     this.toString().replace("""\"""", "\"")
