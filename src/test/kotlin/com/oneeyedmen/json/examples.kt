@@ -1,5 +1,6 @@
 package com.oneeyedmen.json
 
+
 val aNull = "null"
 
 val aBool = "true"
@@ -11,18 +12,17 @@ val aFloat = "12.34"
 val anENumber = "12.34E5"
 val aNegative = "-12.34"
 val numbers = listOf(
-    aBool,
     anInt,
     aFloat,
     anENumber,
     aNegative,
 )
 
-val aString = "banana"
-val anEmptyString = ""
-val aBlankString = "  "
-val aStringWithASpace = "Hello world"
-val aStringWithAQuote = """Hello \"world\""""
+val aString = "\"banana\""
+val anEmptyString = "\"\""
+val aBlankString = "\"  \""
+val aStringWithASpace = "\"Hello world\""
+val aStringWithAQuote = "\"Hello \"world\""
 val strings = listOf(
     aString,
     anEmptyString,
