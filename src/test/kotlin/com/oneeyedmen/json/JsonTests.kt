@@ -88,7 +88,7 @@ class JsonTests {
     }
 }
 
-fun parse(json: String): Any? {
+private fun parse(json: String): Any? {
     val trimmed = json.trim()
     return when {
         trimmed == "null" -> null

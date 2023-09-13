@@ -22,7 +22,7 @@ val aString = "\"banana\""
 val anEmptyString = "\"\""
 val aBlankString = "\"  \""
 val aStringWithASpace = "\"Hello world\""
-val aStringWithAQuote = "\"Hello \"world\""
+val aStringWithAQuote = "\"Hello \\\"world\""
 val strings = listOf(
     aString,
     anEmptyString,
