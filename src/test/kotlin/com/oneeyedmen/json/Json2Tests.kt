@@ -47,6 +47,10 @@ class Json2Tests {
         expectThrows<IllegalArgumentException> {
             parse("nullable")
         }
+        // TODO
+//        expectThrows<IllegalArgumentException> {
+//            parse("null,")
+//        }
     }
 
     @Test
@@ -72,6 +76,36 @@ class Json2Tests {
             expectThat(parse(it)).isA<BigDecimal>()
         }
     }
+
+    @Test
+    fun arrays() {
+        expectThat(parse("[]")).isEqualTo(emptyList<Any?>())
+        expectThat(parse(" []")).isEqualTo(emptyList<Any?>())
+        expectThat(parse(" []  ")).isEqualTo(emptyList<Any?>())
+        expectThat(parse("[ ]")).isEqualTo(emptyList<Any?>())
+        expectThat(parse("[\n]")).isEqualTo(emptyList<Any?>())
+        expectThrows<IllegalArgumentException> {
+            parse("[")
+        }
+        expectThat(parse("[\"banana\"]")).isEqualTo(listOf("banana"))
+        expectThat(parse("[ null ]")).isEqualTo(listOf(null))
+
+        expectThat(parse("[ \"banana\", null ]"))
+            .isEqualTo(listOf("banana", null))
+        expectThat(parse("[ \"banana\" null ]"))
+            .isEqualTo(listOf("banana", null))
+        expectThat(parse("[ true, false ]"))
+            .isEqualTo(listOf(true, false))
+        // TODO show lists need comma separators
+        expectThat(parse("[ \"Hello, World\", null ]"))
+            .isEqualTo(listOf("Hello, World", null))
+        expectThat(parse("[ \"[Hello], World\", null ]"))
+            .isEqualTo(listOf("[Hello], World", null))
+
+        expectThat(parse("[ \"Hello\", [true, []] ]"))
+            .isEqualTo(listOf("Hello", listOf<Any?>(true, emptyList<Any?>())))
+
+    }
 }
 
 private fun parse(json: String): Any? {
@@ -92,7 +126,9 @@ class Ground(previousState: ParseState?) : ParseState(previousState) {
     override fun accept(char: Char): ParseState =
         when {
             char == '"' -> StringState(this, char)
+            char == '[' -> ArrayState(this, char)
             char.isWhitespace() -> this
+            char == ',' -> this
             else -> Literal(this, char)
         }
 
@@ -112,6 +148,7 @@ class Literal(
     override fun accept(char: Char): ParseState {
         return when {
             char.isWhitespace() -> Ground(this)
+            char == ',' -> Ground(this)
             else -> {
                 chars.append(char)
                 this
@@ -124,7 +161,7 @@ class Literal(
             "null" -> null
             "true" -> true
             "false" -> false
-            else -> string.toBigDecimalOrNull() ?: throw IllegalArgumentException()
+            else -> string.toBigDecimalOrNull() ?: throw IllegalArgumentException("Not a literal <$string>")
         }
 
 }
@@ -156,5 +193,39 @@ class StringState(
         when {
             chars.last() != '\"' -> throw IllegalArgumentException()
             else -> chars.substring(1, chars.length - 1)
+        }
+}
+
+class ArrayState(
+    previousState: ParseState?,
+    char: Char
+) : ParseState(previousState) {
+    private val chars = StringBuilder().append(char)
+    private val elements = mutableListOf<ParseState>()
+    private var parseState: ParseState = Ground(null)
+    override fun accept(char: Char): ParseState =
+        when  {
+            char == ']' && parseState is Ground -> {
+                chars.append(char)
+                elements.add(parseState)
+                Ground(this)
+            }
+
+            else -> {
+                val newParseState = parseState.accept(char)
+                if (parseState != newParseState)
+                    elements.add(parseState)
+                parseState = newParseState
+                chars.append(char)
+                this
+            }
+        }
+
+    override fun value(): List<Any?> =
+        when {
+            chars.last() != ']' -> throw IllegalArgumentException()
+            elements.isEmpty() -> emptyList()
+            elements.size == 1 && elements.first() is Ground -> emptyList()
+            else -> elements.filterNot { it is Ground }.map { it.value() }
         }
 }
