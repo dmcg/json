@@ -18,8 +18,10 @@ class Ground(previousState: ParseState?) : ParseState(previousState) {
         when {
             char == '"' -> StringState(this, char)
             char == '[' -> ArrayState(this)
+            char == '{' -> ObjectState(this)
             char.isWhitespace() -> this
-            char == ',' -> this
+            char == ',' -> Comma(this)
+            char == '=' -> Equals(this)
             else -> Literal(this, char)
         }
 
@@ -93,8 +95,8 @@ class ArrayState(
     private var isComplete = false
     private var parseState: ParseState = Ground(null)
     override fun accept(char: Char): ParseState =
-        when  {
-            char == ']' && parseState is Ground -> {
+        when {
+            char == ']' && (parseState is Ground || parseState is Literal) -> {
                 isComplete = true
                 Ground(this)
             }
@@ -109,10 +111,67 @@ class ArrayState(
         when {
             !isComplete -> throw IllegalArgumentException()
             else -> parseState.toSequenceOfStates()
-                .filterNot { it is Ground }
+                .filterNot { it is Ground || it is Comma }
                 .map { it.value() }
                 .toList().reversed()
         }
+}
+
+class ObjectState(
+    previousState: ParseState?
+) : ParseState(previousState) {
+    private var isComplete = false
+    private var parseState: ParseState = Ground(null)
+
+    override fun accept(char: Char): ParseState =
+        when {
+            char == '}' && (parseState is Ground || parseState is Literal) -> {
+                isComplete = true
+                Ground(this)
+            }
+
+            else -> {
+                parseState = parseState.accept(char)
+                this
+            }
+        }
+
+
+    override fun value(): Map<String, Any?> =
+        when {
+            !isComplete -> throw IllegalArgumentException()
+            else -> {
+                parseState.toSequenceOfStates()
+                    .filterNot { it is Ground || it is Comma }
+                    .toList().reversed()
+                    .windowed(3, 3)
+                    .associate { threeStates ->
+                        val key = threeStates[0].value() as String
+                        val value = threeStates[2].value()
+                        key to value
+                    }
+            }
+        }
+}
+
+class Equals(previousState: ParseState?) : ParseState(previousState) {
+    override fun accept(char: Char): ParseState {
+        return Ground(this).accept(char)
+    }
+
+    override fun value(): Any? {
+        TODO("Not yet implemented")
+    }
+}
+
+class Comma(previousState: ParseState?) : ParseState(previousState) {
+    override fun accept(char: Char): ParseState {
+        return Ground(this).accept(char)
+    }
+
+    override fun value(): Any? {
+        TODO("Not yet implemented")
+    }
 }
 
 private fun ParseState.toSequenceOfStates() = generateSequence(this) {

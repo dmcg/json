@@ -79,16 +79,18 @@ class Json2Tests {
 
     @Test
     fun arrays() {
-        expectThat(parse("[]")).isEqualTo(emptyList<Any?>())
-        expectThat(parse(" []")).isEqualTo(emptyList<Any?>())
-        expectThat(parse(" []  ")).isEqualTo(emptyList<Any?>())
-        expectThat(parse("[ ]")).isEqualTo(emptyList<Any?>())
-        expectThat(parse("[\n]")).isEqualTo(emptyList<Any?>())
+        val emptyList = emptyList<Any?>()
+        expectThat(parse("[]")).isEqualTo(emptyList)
+        expectThat(parse(" []")).isEqualTo(emptyList)
+        expectThat(parse(" []  ")).isEqualTo(emptyList)
+        expectThat(parse("[ ]")).isEqualTo(emptyList)
+        expectThat(parse("[\n]")).isEqualTo(emptyList)
         expectThrows<IllegalArgumentException> {
             parse("[")
         }
         expectThat(parse("[\"banana\"]")).isEqualTo(listOf("banana"))
         expectThat(parse("[ null ]")).isEqualTo(listOf(null))
+        expectThat(parse("[null]")).isEqualTo(listOf(null))
 
         expectThat(parse("[ \"banana\", null ]"))
             .isEqualTo(listOf("banana", null))
@@ -103,7 +105,39 @@ class Json2Tests {
             .isEqualTo(listOf("[Hello], World", null))
 
         expectThat(parse("[ \"Hello\", [true, []] ]"))
-            .isEqualTo(listOf("Hello", listOf<Any?>(true, emptyList<Any?>())))
+            .isEqualTo(listOf("Hello", listOf<Any?>(true, emptyList)))
+
+        expectThat(parse("""[ {"aString"="banana"}, [true, []] ]"""))
+            .isEqualTo(listOf(mapOf("aString" to "banana"), listOf(true, emptyList)))
+    }
+
+    @Test
+    fun objects() {
+        val emptyMap = emptyMap<String, Any?>()
+        expectThat(parse("{}")).isEqualTo(emptyMap)
+        expectThat(parse(" {}")).isEqualTo(emptyMap)
+        expectThat(parse(" {}  ")).isEqualTo(emptyMap)
+        expectThat(parse("{ }")).isEqualTo(emptyMap)
+        expectThat(parse("{\n}")).isEqualTo(emptyMap)
+        expectThrows<IllegalArgumentException> {
+            parse("{")
+        }
+
+        expectThat(parse("""{ "aString" = "banana" }"""))
+            .isEqualTo(mapOf("aString" to "banana"))
+        expectThat(parse("""{"aString"="banana"}"""))
+            .isEqualTo(mapOf("aString" to "banana"))
+        expectThat(parse("""{"aString"=null}"""))
+            .isEqualTo(mapOf("aString" to null))
+        expectThat(parse("""{"aString"="{hello}"}"""))
+            .isEqualTo(mapOf("aString" to "{hello}"))
+
+        expectThat(parse("""{"aString"="{hello}", "aBoolean" = true}"""))
+            .isEqualTo(mapOf("aString" to "{hello}", "aBoolean" to true))
+        expectThat(parse("""{"aString"="{hello}", "anArray" = [true, false]}"""))
+            .isEqualTo(mapOf("aString" to "{hello}", "anArray" to listOf(true, false)))
+        expectThat(parse("""{"aString"="{hello}", "anObject" = { "aBoolean" = true}}"""))
+            .isEqualTo(mapOf("aString" to "{hello}", "anObject" to mapOf("aBoolean" to true)))
 
     }
 }
