@@ -17,7 +17,7 @@ class Ground(previousState: ParseState?) : ParseState(previousState) {
     override fun accept(char: Char): ParseState =
         when {
             char == '"' -> StringState(this, char)
-            char == '[' -> ArrayState(this, char)
+            char == '[' -> ArrayState(this)
             char.isWhitespace() -> this
             char == ',' -> this
             else -> Literal(this, char)
@@ -88,35 +88,34 @@ class StringState(
 }
 
 class ArrayState(
-    previousState: ParseState?,
-    char: Char
+    previousState: ParseState?
 ) : ParseState(previousState) {
-    private val chars = StringBuilder().append(char)
-    private val elements = mutableListOf<ParseState>()
+    private var isComplete = false
     private var parseState: ParseState = Ground(null)
     override fun accept(char: Char): ParseState =
         when  {
             char == ']' && parseState is Ground -> {
-                chars.append(char)
-                elements.add(parseState)
+                isComplete = true
                 Ground(this)
             }
 
             else -> {
-                val newParseState = parseState.accept(char)
-                if (parseState != newParseState)
-                    elements.add(parseState)
-                parseState = newParseState
-                chars.append(char)
+                parseState = parseState.accept(char)
                 this
             }
         }
 
     override fun value(): List<Any?> =
         when {
-            chars.last() != ']' -> throw IllegalArgumentException()
-            elements.isEmpty() -> emptyList()
-            elements.size == 1 && elements.first() is Ground -> emptyList()
-            else -> elements.filterNot { it is Ground }.map { it.value() }
+            !isComplete -> throw IllegalArgumentException()
+            else -> parseState.toSequenceOfStates()
+                .filterNot { it is Ground }
+                .map { it.value() }
+                .toList().reversed()
         }
 }
+
+private fun ParseState.toSequenceOfStates() = generateSequence(this) {
+    it.previousState
+}
+
