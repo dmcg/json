@@ -21,7 +21,7 @@ class Ground(previousState: ParseState?) : ParseState(previousState) {
             char == '{' -> ObjectState(this)
             char.isWhitespace() -> this
             char == ',' -> Comma(this)
-            char == '=' -> Equals(this)
+            char == ':' -> Colon(this)
             else -> Literal(this, char)
         }
 
@@ -154,7 +154,7 @@ class ObjectState(
         }
 }
 
-class Equals(previousState: ParseState?) : ParseState(previousState) {
+class Colon(previousState: ParseState?) : ParseState(previousState) {
     override fun accept(char: Char): ParseState {
         return Ground(this).accept(char)
     }
