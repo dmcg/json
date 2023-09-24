@@ -3,7 +3,10 @@ package com.oneeyedmen.json
 fun parse(json: CharSequence): Any? {
     var state: ParseState = Ground(null)
     json.forEach { char ->
-        state = state.accept(char)
+        val newState = state.accept(char)
+        if (newState != state && newState !is Ground && state.previousState != null)
+            throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
+        state = newState
     }
     return state.value()
 }

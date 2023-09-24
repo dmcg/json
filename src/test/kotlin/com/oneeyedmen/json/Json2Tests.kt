@@ -5,6 +5,7 @@ import strikt.api.expectThat
 import strikt.api.expectThrows
 import strikt.assertions.isA
 import strikt.assertions.isEqualTo
+import strikt.assertions.message
 import java.math.BigDecimal
 
 class Json2Tests {
@@ -47,10 +48,6 @@ class Json2Tests {
         expectThrows<IllegalArgumentException> {
             parse("nullable")
         }
-        // TODO
-//        expectThrows<IllegalArgumentException> {
-//            parse("null,")
-//        }
     }
 
     @Test
@@ -78,6 +75,25 @@ class Json2Tests {
     }
 
     @Test
+    fun `doesnt allow multiple top level things`() {
+        expectThrows<IllegalArgumentException> {
+            parse("true false")
+        }.and {
+            message.isEqualTo("Cannot have more than one top level result, failed at <f>")
+        }
+        expectThrows<IllegalArgumentException> {
+            parse("null,")
+        }.and {
+            message.isEqualTo("Cannot have more than one top level result, failed at <,>")
+        }
+        expectThrows<IllegalArgumentException> {
+            parse("null ,")
+        }.and {
+            message.isEqualTo("Cannot have more than one top level result, failed at <,>")
+        }
+    }
+
+    @Test
     fun arrays() {
         val emptyList = emptyList<Any?>()
         expectThat(parse("[]")).isEqualTo(emptyList)
@@ -98,7 +114,6 @@ class Json2Tests {
             .isEqualTo(listOf("banana", null))
         expectThat(parse("[ true, false ]"))
             .isEqualTo(listOf(true, false))
-        // TODO show lists need comma separators
         expectThat(parse("[ \"Hello, World\", null ]"))
             .isEqualTo(listOf("Hello, World", null))
         expectThat(parse("[ \"[Hello], World\", null ]"))
@@ -109,6 +124,10 @@ class Json2Tests {
 
         expectThat(parse("""[ {"aString":"banana"}, [true, []] ]"""))
             .isEqualTo(listOf(mapOf("aString" to "banana"), listOf(true, emptyList)))
+
+        // TODO show lists need comma separators
+        expectThat(parse("[true false \"banana\"]"))
+            .isEqualTo(listOf(true, false, "banana"))
     }
 
     @Test
