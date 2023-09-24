@@ -40,6 +40,7 @@ private class Literal(
 
     override fun accept(char: Char) = when {
         char == ',' -> Comma(this)
+        char == ':' -> Colon(this)
         char.isWhitespace() -> Ground(this)
         else -> {
             chars.append(char)

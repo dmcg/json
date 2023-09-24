@@ -134,6 +134,8 @@ class Json2Tests {
 
         expectThat(parse("""{"aString":"{hello}", "aBoolean" : true}"""))
             .isEqualTo(mapOf("aString" to "{hello}", "aBoolean" to true))
+        expectThat(parse("""{"aString":null, "aBoolean" : true}"""))
+            .isEqualTo(mapOf("aString" to null, "aBoolean" to true))
         expectThat(parse("""{"aString":"{hello}", "anArray" : [true, false]}"""))
             .isEqualTo(mapOf("aString" to "{hello}", "anArray" to listOf(true, false)))
         expectThat(parse("""{"aString":"{hello}", "anObject" : { "aBoolean" : true}}"""))
