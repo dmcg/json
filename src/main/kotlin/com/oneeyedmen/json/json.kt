@@ -1,6 +1,6 @@
 package com.oneeyedmen.json
 
-fun parse(json: String): Any? {
+fun parse(json: CharSequence): Any? {
     var state: ParseState = Ground(null)
     json.forEach { char ->
         state = state.accept(char)
@@ -8,20 +8,20 @@ fun parse(json: String): Any? {
     return state.value()
 }
 
-abstract class ParseState(val previousState: ParseState?) {
+private abstract class ParseState(val previousState: ParseState?) {
     abstract fun accept(char: Char): ParseState
     abstract fun value(): Any?
 }
 
-class Ground(previousState: ParseState?) : ParseState(previousState) {
+private class Ground(previousState: ParseState?) : ParseState(previousState) {
     override fun accept(char: Char): ParseState =
         when {
             char == '"' -> StringState(this, char)
             char == '[' -> ArrayState(this)
             char == '{' -> ObjectState(this)
-            char.isWhitespace() -> this
             char == ',' -> Comma(this)
             char == ':' -> Colon(this)
+            char.isWhitespace() -> this
             else -> Literal(this, char)
         }
 
@@ -32,20 +32,18 @@ class Ground(previousState: ParseState?) : ParseState(previousState) {
         }
 }
 
-class Literal(
+private class Literal(
     previousState: ParseState?,
     char: Char
 ) : ParseState(previousState) {
     private val chars = StringBuilder().append(char)
 
-    override fun accept(char: Char): ParseState {
-        return when {
-            char.isWhitespace() -> Ground(this)
-            char == ',' -> Ground(this)
-            else -> {
-                chars.append(char)
-                this
-            }
+    override fun accept(char: Char) = when {
+        char == ',' -> Comma(this)
+        char.isWhitespace() -> Ground(this)
+        else -> {
+            chars.append(char)
+            this
         }
     }
 
@@ -59,7 +57,7 @@ class Literal(
 
 }
 
-class StringState(
+private class StringState(
     previousState: ParseState?,
     char: Char
 ) : ParseState(previousState) {
@@ -89,7 +87,7 @@ class StringState(
         }
 }
 
-class ArrayState(
+private class ArrayState(
     previousState: ParseState?
 ) : ParseState(previousState) {
     private var isComplete = false
@@ -117,7 +115,7 @@ class ArrayState(
         }
 }
 
-class ObjectState(
+private class ObjectState(
     previousState: ParseState?
 ) : ParseState(previousState) {
     private var isComplete = false
@@ -154,7 +152,7 @@ class ObjectState(
         }
 }
 
-class Colon(previousState: ParseState?) : ParseState(previousState) {
+private class Colon(previousState: ParseState?) : ParseState(previousState) {
     override fun accept(char: Char): ParseState {
         return Ground(this).accept(char)
     }
@@ -164,7 +162,7 @@ class Colon(previousState: ParseState?) : ParseState(previousState) {
     }
 }
 
-class Comma(previousState: ParseState?) : ParseState(previousState) {
+private class Comma(previousState: ParseState?) : ParseState(previousState) {
     override fun accept(char: Char): ParseState {
         return Ground(this).accept(char)
     }
