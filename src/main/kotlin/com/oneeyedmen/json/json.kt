@@ -1,50 +1,59 @@
 package com.oneeyedmen.json
 
 fun parse(json: CharSequence): Any? {
-    var state: ParseState = Ground(null)
+    val initialState = Ground
+    var state: ParseState = initialState
+    val values = mutableListOf<Any?>()
     json.forEach { char ->
         val newState = state.accept(char)
-        if (newState != state && newState !is Ground && state.previousState != null)
+        if (newState != state && (newState !is Ground && values.isNotEmpty()) || newState is Comma)
             throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
+        if (newState != state && state is Valued) {
+            val oldState = state as Valued
+            values.add(oldState.value())
+        }
         state = newState
     }
-    return state.value()
+    if (state is Valued) {
+        val valueState = state as Valued
+        values.add(valueState.value())
+    }
+    return when {
+        values.isEmpty() -> throw IllegalArgumentException()
+        else -> values.single()
+    }
 }
 
-private abstract class ParseState(val previousState: ParseState?) {
+interface Valued {
+    fun value(): Any?
+}
+
+private abstract class ParseState {
     abstract fun accept(char: Char): ParseState
-    abstract fun value(): Any?
 }
 
-private class Ground(previousState: ParseState?) : ParseState(previousState) {
+private object Ground : ParseState() {
     override fun accept(char: Char): ParseState =
         when {
-            char == '"' -> StringState(this, char)
-            char == '[' -> ArrayState(this)
-            char == '{' -> ObjectState(this)
-            char == ',' -> Comma(this)
-            char == ':' -> Colon(this)
+            char == '"' -> StringState(char)
+            char == '[' -> ArrayState()
+            char == '{' -> ObjectState()
+            char == ',' -> Comma
+            char == ':' -> Colon
             char.isWhitespace() -> this
-            else -> Literal(this, char)
-        }
-
-    override fun value(): Any? =
-        when (previousState) {
-            null -> throw IllegalArgumentException()
-            else -> previousState.value()
+            else -> Literal(char)
         }
 }
 
 private class Literal(
-    previousState: ParseState?,
     char: Char
-) : ParseState(previousState) {
+) : ParseState(), Valued {
     private val chars = StringBuilder().append(char)
 
     override fun accept(char: Char) = when {
-        char == ',' -> Comma(this)
-        char == ':' -> Colon(this)
-        char.isWhitespace() -> Ground(this)
+        char == ',' -> Comma
+        char == ':' -> Colon
+        char.isWhitespace() -> Ground
         else -> {
             chars.append(char)
             this
@@ -62,9 +71,8 @@ private class Literal(
 }
 
 private class StringState(
-    previousState: ParseState?,
     char: Char
-) : ParseState(previousState) {
+) : ParseState(), Valued {
     private val chars = StringBuilder().append(char)
     override fun accept(char: Char): ParseState =
         when (char) {
@@ -74,7 +82,7 @@ private class StringState(
                     this
                 } else {
                     chars.append(char)
-                    Ground(this)
+                    Ground
                 }
             }
 
@@ -91,20 +99,21 @@ private class StringState(
         }
 }
 
-private class ArrayState(
-    previousState: ParseState?
-) : ParseState(previousState) {
+private class ArrayState : ParseState(), Valued {
     private var isComplete = false
-    private var parseState: ParseState = Ground(null)
+    private var parseState: ParseState = Ground
+    private val states = mutableListOf<ParseState>()
     override fun accept(char: Char): ParseState =
         when {
             char == ']' && (parseState is Ground || parseState is Literal) -> {
                 isComplete = true
-                Ground(this)
+                Ground
             }
 
             else -> {
                 parseState = parseState.accept(char)
+                if (states.lastOrNull() != parseState)
+                    states.add(parseState)
                 this
             }
         }
@@ -112,28 +121,28 @@ private class ArrayState(
     override fun value(): List<Any?> =
         when {
             !isComplete -> throw IllegalArgumentException()
-            else -> parseState.toSequenceOfStates()
-                .filterNot { it is Ground || it is Comma }
+            else -> states
+                .filterIsInstance<Valued>()
                 .map { it.value() }
-                .toList().reversed()
         }
 }
 
-private class ObjectState(
-    previousState: ParseState?
-) : ParseState(previousState) {
+private class ObjectState : ParseState(), Valued {
     private var isComplete = false
-    private var parseState: ParseState = Ground(null)
+    private var parseState: ParseState = Ground
+    private val states = mutableListOf<ParseState>()
 
     override fun accept(char: Char): ParseState =
         when {
             char == '}' && (parseState is Ground || parseState is Literal) -> {
                 isComplete = true
-                Ground(this)
+                Ground
             }
 
             else -> {
                 parseState = parseState.accept(char)
+                if (states.lastOrNull() != parseState)
+                    states.add(parseState)
                 this
             }
         }
@@ -143,40 +152,22 @@ private class ObjectState(
         when {
             !isComplete -> throw IllegalArgumentException()
             else -> {
-                parseState.toSequenceOfStates()
-                    .filterNot { it is Ground || it is Comma }
-                    .toList().reversed()
-                    .windowed(3, 3)
+                states
+                    .filterIsInstance<Valued>()
+                    .windowed(2, 2)
                     .associate { threeStates ->
                         val key = threeStates[0].value() as String
-                        val value = threeStates[2].value()
+                        val value = threeStates[1].value()
                         key to value
                     }
             }
         }
 }
 
-private class Colon(previousState: ParseState?) : ParseState(previousState) {
-    override fun accept(char: Char): ParseState {
-        return Ground(this).accept(char)
-    }
-
-    override fun value(): Any? {
-        TODO("Not yet implemented")
-    }
+private object Colon : ParseState() {
+    override fun accept(char: Char) = Ground.accept(char)
 }
 
-private class Comma(previousState: ParseState?) : ParseState(previousState) {
-    override fun accept(char: Char): ParseState {
-        return Ground(this).accept(char)
-    }
-
-    override fun value(): Any? {
-        TODO("Not yet implemented")
-    }
+private object Comma : ParseState() {
+    override fun accept(char: Char) = Ground.accept(char)
 }
-
-private fun ParseState.toSequenceOfStates() = generateSequence(this) {
-    it.previousState
-}
-

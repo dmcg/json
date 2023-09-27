@@ -1,5 +1,6 @@
 package com.oneeyedmen.json
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import strikt.api.expectThat
 import strikt.api.expectThrows
@@ -125,9 +126,14 @@ class Json2Tests {
         expectThat(parse("""[ {"aString":"banana"}, [true, []] ]"""))
             .isEqualTo(listOf(mapOf("aString" to "banana"), listOf(true, emptyList)))
 
-        // TODO show lists need comma separators
-        expectThat(parse("[true false \"banana\"]"))
-            .isEqualTo(listOf(true, false, "banana"))
+    }
+
+    @Disabled
+    @Test
+    fun `arrays need comma separators`() {
+        expectThrows<IllegalArgumentException> {
+            parse("[true false \"banana\"]")
+        }.message.isEqualTo("comma")
     }
 
     @Test
