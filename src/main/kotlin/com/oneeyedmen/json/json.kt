@@ -1,12 +1,12 @@
 package com.oneeyedmen.json
 
 fun parse(json: CharSequence): Any? {
-    var state: ParseState = Ground
+    var state: ParseState = TopLevelGround
     val values = mutableListOf<Any?>()
     json.forEach { char ->
         val newState = state.accept(char)
         if (newState != state) {
-            if ((newState !is Ground && values.isNotEmpty()) || newState is Comma || newState is Colon)
+            if (values.isNotEmpty())
                 throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
             else
                 values.addValueFrom(state)
@@ -32,32 +32,49 @@ private abstract class ParseState {
     abstract fun accept(char: Char): ParseState
 }
 
+private object TopLevelGround : ParseState() {
+    override fun accept(char: Char): ParseState =
+        when {
+            char == '"' -> StringState(this, char)
+            char == '[' -> ArrayState(this)
+            char == '{' -> ObjectState(this)
+            char.isWhitespace() -> this
+            char.isValidInLiteral() -> Literal(this, char)
+            else -> throw IllegalArgumentException("Not a valid top-level character <$char>")
+        }
+
+}
+
+private fun Char.isValidInLiteral() = "nulltruefalse0123456789-+.eE".contains(this)
+
 private object Ground : ParseState() {
     override fun accept(char: Char): ParseState =
         when {
-            char == '"' -> StringState(char)
-            char == '[' -> ArrayState()
-            char == '{' -> ObjectState()
+            char == '"' -> StringState(this, char)
+            char == '[' -> ArrayState(this)
+            char == '{' -> ObjectState(this)
             char == ',' -> Comma
             char == ':' -> Colon
             char.isWhitespace() -> this
-            else -> Literal(char)
+            else -> Literal(this, char)
         }
 }
 
 private class Literal(
+    val ground: ParseState,
     char: Char
 ) : ParseState(), Valued {
     private val chars = StringBuilder().append(char)
 
     override fun accept(char: Char) = when {
-        char == ',' -> Comma
-        char == ':' -> Colon
-        char.isWhitespace() -> Ground
-        else -> {
+        char == ',' -> ground.accept(char)
+        char == ':' -> ground.accept(char)
+        char.isWhitespace() -> ground
+        char.isValidInLiteral() -> {
             chars.append(char)
             this
         }
+        else -> throw IllegalArgumentException("Illegal literal character <$char>")
     }
 
     override fun value(): Any? =
@@ -71,6 +88,7 @@ private class Literal(
 }
 
 private class StringState(
+    val ground: ParseState,
     char: Char
 ) : ParseState(), Valued {
     private val chars = StringBuilder().append(char)
@@ -82,7 +100,7 @@ private class StringState(
                     this
                 } else {
                     chars.append(char)
-                    Ground
+                    ground
                 }
             }
 
@@ -99,7 +117,7 @@ private class StringState(
         }
 }
 
-private class ArrayState : ParseState(), Valued {
+private class ArrayState(val ground: ParseState) : ParseState(), Valued {
     private var isComplete = false
     private var parseState: ParseState = Ground
     private val states = mutableListOf<ParseState>()
@@ -107,7 +125,7 @@ private class ArrayState : ParseState(), Valued {
         when {
             char == ']' && (parseState is Ground || parseState is Literal) -> {
                 isComplete = true
-                Ground
+                ground
             }
 
             else -> {
@@ -127,7 +145,7 @@ private class ArrayState : ParseState(), Valued {
         }
 }
 
-private class ObjectState : ParseState(), Valued {
+private class ObjectState(val ground: ParseState) : ParseState(), Valued {
     private var isComplete = false
     private var parseState: ParseState = Ground
     private val states = mutableListOf<ParseState>()
@@ -136,7 +154,7 @@ private class ObjectState : ParseState(), Valued {
         when {
             char == '}' && (parseState is Ground || parseState is Literal) -> {
                 isComplete = true
-                Ground
+                ground
             }
 
             else -> {

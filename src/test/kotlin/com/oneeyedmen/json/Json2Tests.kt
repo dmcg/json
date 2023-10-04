@@ -48,7 +48,7 @@ class Json2Tests {
         expectThat(parse("  null ")).isEqualTo(null)
         expectThrows<IllegalArgumentException> {
             parse("nullable")
-        }
+        }.message.isEqualTo("Illegal literal character <b>")
     }
 
     @Test
@@ -85,17 +85,32 @@ class Json2Tests {
         expectThrows<IllegalArgumentException> {
             parse("null,")
         }.and {
-            message.isEqualTo("Cannot have more than one top level result, failed at <,>")
+            message.isEqualTo("Not a valid top-level character <,>")
         }
         expectThrows<IllegalArgumentException> {
             parse("null ,")
         }.and {
-            message.isEqualTo("Cannot have more than one top level result, failed at <,>")
+            message.isEqualTo("Not a valid top-level character <,>")
         }
         expectThrows<IllegalArgumentException> {
             parse("null:")
         }.and {
-            message.isEqualTo("Cannot have more than one top level result, failed at <:>")
+            message.isEqualTo("Not a valid top-level character <:>")
+        }
+        expectThrows<IllegalArgumentException> {
+            parse("\"banana\",")
+        }.and {
+            message.isEqualTo("Not a valid top-level character <,>")
+        }
+        expectThrows<IllegalArgumentException> {
+            parse("[],")
+        }.and {
+            message.isEqualTo("Not a valid top-level character <,>")
+        }
+        expectThrows<IllegalArgumentException> {
+            parse("{},")
+        }.and {
+            message.isEqualTo("Not a valid top-level character <,>")
         }
     }
 
