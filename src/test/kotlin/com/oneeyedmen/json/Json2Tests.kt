@@ -92,6 +92,11 @@ class Json2Tests {
         }.and {
             message.isEqualTo("Cannot have more than one top level result, failed at <,>")
         }
+        expectThrows<IllegalArgumentException> {
+            parse("null:")
+        }.and {
+            message.isEqualTo("Cannot have more than one top level result, failed at <:>")
+        }
     }
 
     @Test

@@ -1,27 +1,27 @@
 package com.oneeyedmen.json
 
 fun parse(json: CharSequence): Any? {
-    val initialState = Ground
-    var state: ParseState = initialState
+    var state: ParseState = Ground
     val values = mutableListOf<Any?>()
     json.forEach { char ->
         val newState = state.accept(char)
-        if (newState != state && (newState !is Ground && values.isNotEmpty()) || newState is Comma)
-            throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
-        if (newState != state && state is Valued) {
-            val oldState = state as Valued
-            values.add(oldState.value())
+        if (newState != state) {
+            if ((newState !is Ground && values.isNotEmpty()) || newState is Comma || newState is Colon)
+                throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
+            else
+                values.addValueFrom(state)
         }
         state = newState
     }
-    if (state is Valued) {
-        val valueState = state as Valued
-        values.add(valueState.value())
-    }
+    values.addValueFrom(state)
     return when {
         values.isEmpty() -> throw IllegalArgumentException()
         else -> values.single()
     }
+}
+
+private fun MutableList<Any?>.addValueFrom(state: ParseState) {
+    (state as? Valued)?.let { add(it.value()) }
 }
 
 interface Valued {
