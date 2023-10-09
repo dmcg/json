@@ -4,14 +4,14 @@ fun parse(json: CharSequence): Any? {
     var state: ParseState = TopLevelGround
     val values = mutableListOf<Any?>()
     json.forEach { char ->
-        val newState = state.accept(char)
-        if (newState != state) {
-            if (values.isNotEmpty())
-                throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
-            else
-                values.addValueFrom(state)
+        state = state.accept(char).also { newState ->
+            if (newState != state) {
+                if (values.isNotEmpty())
+                    throw IllegalArgumentException("Cannot have more than one top level result, failed at <$char>")
+                else
+                    values.addValueFrom(state)
+            }
         }
-        state = newState
     }
     values.addValueFrom(state)
     return when {
@@ -73,6 +73,7 @@ private class Literal(
             chars.append(char)
             this
         }
+
         else -> throw IllegalArgumentException("Illegal literal character <$char>")
     }
 
@@ -117,51 +118,54 @@ private class StringState(
 }
 
 private class ArrayState(val ground: ParseState) : ParseState(), Valued {
+    private var state: ParseState = ArrayGround
+    private val values = mutableListOf<Any?>()
     private var isComplete = false
-    private var parseState: ParseState = ArrayGround
-    private val states = mutableListOf<ParseState>()
+
     override fun accept(char: Char): ParseState =
         when {
-            char == ']' && (parseState is Literal || parseState is SeekingComma || (parseState is ArrayGround && states.filterIsInstance<Valued>().isEmpty())) -> {
+            char == ']' && (arrayIsCompletable()) -> {
                 isComplete = true
+                values.addValueFrom(state)
                 ground
             }
 
             else -> {
-                parseState = parseState.accept(char)
-                if (states.lastOrNull() != parseState)
-                    states.add(parseState)
+                state = state.accept(char).also { newState ->
+                    if (newState != state) {
+                        values.addValueFrom(state)
+                    }
+                }
                 this
             }
         }
 
-    override fun value(): List<Any?> =
-        when {
-            !isComplete -> throw IllegalArgumentException()
-            else -> states
-                .filterIsInstance<Valued>()
-                .map { it.value() }
-        }
+    private fun arrayIsCompletable() =
+        state is Literal ||
+            state is SeekingComma ||
+            (state is ArrayGround && values.isEmpty())
+
+    override fun value(): List<Any?> = when {
+        !isComplete -> throw IllegalArgumentException("Unterminated array")
+        else -> values
+    }
 
     private object ArrayGround : ParseState() {
-        override fun accept(char: Char): ParseState =
-            when {
-                char == '"' -> StringState(SeekingComma, char)
-                char == '[' -> ArrayState(SeekingComma)
-                char == '{' -> ObjectState(SeekingComma)
-                char.isWhitespace() -> this
-                char.isValidInLiteral() -> Literal(SeekingComma, char)
-                else -> throw IllegalArgumentException("Unexpected character in array <$char>")
-            }
+        override fun accept(char: Char): ParseState = when {
+            char == '"' -> StringState(SeekingComma, char)
+            char == '[' -> ArrayState(SeekingComma)
+            char == '{' -> ObjectState(SeekingComma)
+            char.isWhitespace() -> this
+            char.isValidInLiteral() -> Literal(SeekingComma, char)
+            else -> throw IllegalArgumentException("Unexpected character in array <$char>")
+        }
     }
 
     private object SeekingComma : ParseState() {
-        override fun accept(char: Char): ParseState {
-            return when {
-                char == ',' -> ArrayGround
-                char.isWhitespace() -> this
-                else -> throw IllegalArgumentException("Expected a comma in an array, got <$char>")
-            }
+        override fun accept(char: Char): ParseState = when {
+            char == ',' -> ArrayGround
+            char.isWhitespace() -> this
+            else -> throw IllegalArgumentException("Expected a comma in an array, got <$char>")
         }
 
     }

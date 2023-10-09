@@ -121,9 +121,6 @@ class Json2Tests {
         expectThat(parse(" []  ")).isEqualTo(emptyList)
         expectThat(parse("[ ]")).isEqualTo(emptyList)
         expectThat(parse("[\n]")).isEqualTo(emptyList)
-        expectThrows<IllegalArgumentException> {
-            parse("[")
-        }
         expectThat(parse("[\"banana\"]")).isEqualTo(listOf("banana"))
         expectThat(parse("[ null ]")).isEqualTo(listOf(null))
         expectThat(parse("[null]")).isEqualTo(listOf(null))
@@ -143,6 +140,19 @@ class Json2Tests {
         expectThat(parse("""[ {"aString":"banana"}, [true, []] ]"""))
             .isEqualTo(listOf(mapOf("aString" to "banana"), listOf(true, emptyList)))
 
+    }
+
+    @Test
+    fun `unterminate arrays`() {
+        expectThrows<IllegalArgumentException> {
+            parse("[")
+        }.message.isEqualTo("Unterminated array")
+        expectThrows<IllegalArgumentException> {
+            parse("[ true")
+        }.message.isEqualTo("Unterminated array")
+        expectThrows<IllegalArgumentException> {
+            parse("[ true,")
+        }.message.isEqualTo("Unterminated array")
     }
 
     @Test
