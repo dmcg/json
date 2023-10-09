@@ -42,7 +42,6 @@ private object TopLevelGround : ParseState() {
             char.isValidInLiteral() -> Literal(this, char)
             else -> throw IllegalArgumentException("Not a valid top-level character <$char>")
         }
-
 }
 
 private fun Char.isValidInLiteral() = "nulltruefalse0123456789-+.eE".contains(this)
@@ -53,7 +52,7 @@ private object Ground : ParseState() {
             char == '"' -> StringState(this, char)
             char == '[' -> ArrayState(this)
             char == '{' -> ObjectState(this)
-            char == ',' -> Comma
+            char == ',' -> Comma(this)
             char == ':' -> Colon
             char.isWhitespace() -> this
             else -> Literal(this, char)
@@ -119,11 +118,11 @@ private class StringState(
 
 private class ArrayState(val ground: ParseState) : ParseState(), Valued {
     private var isComplete = false
-    private var parseState: ParseState = Ground
+    private var parseState: ParseState = ArrayGround
     private val states = mutableListOf<ParseState>()
     override fun accept(char: Char): ParseState =
         when {
-            char == ']' && (parseState is Ground || parseState is Literal) -> {
+            char == ']' && (parseState is Literal || parseState is SeekingComma || (parseState is ArrayGround && states.filterIsInstance<Valued>().isEmpty())) -> {
                 isComplete = true
                 ground
             }
@@ -143,6 +142,29 @@ private class ArrayState(val ground: ParseState) : ParseState(), Valued {
                 .filterIsInstance<Valued>()
                 .map { it.value() }
         }
+
+    private object ArrayGround : ParseState() {
+        override fun accept(char: Char): ParseState =
+            when {
+                char == '"' -> StringState(SeekingComma, char)
+                char == '[' -> ArrayState(SeekingComma)
+                char == '{' -> ObjectState(SeekingComma)
+                char.isWhitespace() -> this
+                char.isValidInLiteral() -> Literal(SeekingComma, char)
+                else -> throw IllegalArgumentException("Unexpected character in array <$char>")
+            }
+    }
+
+    private object SeekingComma : ParseState() {
+        override fun accept(char: Char): ParseState {
+            return when {
+                char == ',' -> ArrayGround
+                char.isWhitespace() -> this
+                else -> throw IllegalArgumentException("Expected a comma in an array, got <$char>")
+            }
+        }
+
+    }
 }
 
 private class ObjectState(val ground: ParseState) : ParseState(), Valued {
@@ -186,6 +208,6 @@ private object Colon : ParseState() {
     override fun accept(char: Char) = Ground.accept(char)
 }
 
-private object Comma : ParseState() {
-    override fun accept(char: Char) = Ground.accept(char)
+private class Comma(val ground: ParseState) : ParseState() {
+    override fun accept(char: Char) = ground.accept(char)
 }

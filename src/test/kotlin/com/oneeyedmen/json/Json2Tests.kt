@@ -1,6 +1,5 @@
 package com.oneeyedmen.json
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import strikt.api.expectThat
 import strikt.api.expectThrows
@@ -131,8 +130,6 @@ class Json2Tests {
 
         expectThat(parse("[ \"banana\", null ]"))
             .isEqualTo(listOf("banana", null))
-        expectThat(parse("[ \"banana\" null ]"))
-            .isEqualTo(listOf("banana", null))
         expectThat(parse("[ true, false ]"))
             .isEqualTo(listOf(true, false))
         expectThat(parse("[ \"Hello, World\", null ]"))
@@ -148,12 +145,32 @@ class Json2Tests {
 
     }
 
-    @Disabled
     @Test
     fun `arrays need comma separators`() {
         expectThrows<IllegalArgumentException> {
             parse("[true false \"banana\"]")
-        }.message.isEqualTo("comma")
+        }.message.isEqualTo("Expected a comma in an array, got <f>")
+        expectThrows<IllegalArgumentException> {
+            parse("[true, false \"banana\"]")
+        }.message.isEqualTo("Expected a comma in an array, got <\">")
+        expectThrows<IllegalArgumentException> {
+            parse("[true,]")
+        }.message.isEqualTo("Unexpected character in array <]>")
+        expectThrows<IllegalArgumentException> {
+            parse("[true ,]")
+        }.message.isEqualTo("Unexpected character in array <]>")
+        expectThrows<IllegalArgumentException> {
+            parse("[true , ]")
+        }.message.isEqualTo("Unexpected character in array <]>")
+        expectThrows<IllegalArgumentException> {
+            parse("[,]")
+        }.message.isEqualTo("Unexpected character in array <,>")
+        expectThrows<IllegalArgumentException> {
+            parse("[ ,]")
+        }.message.isEqualTo("Unexpected character in array <,>")
+        expectThrows<IllegalArgumentException> {
+            parse("[ , ]")
+        }.message.isEqualTo("Unexpected character in array <,>")
     }
 
     @Test
