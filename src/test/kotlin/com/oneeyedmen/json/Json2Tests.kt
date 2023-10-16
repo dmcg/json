@@ -10,16 +10,16 @@ import java.math.BigDecimal
 
 class Json2Tests {
     @Test
-    fun `empty string`() {
+    fun `empty or blank string`() {
         expectThrows<IllegalArgumentException> {
             parse("")
-        }
+        }.message.isEqualTo("No top-level content found")
         expectThrows<IllegalArgumentException> {
             parse(" ")
-        }
+        }.message.isEqualTo("No top-level content found")
         expectThrows<IllegalArgumentException> {
             parse("\n")
-        }
+        }.message.isEqualTo("No top-level content found")
     }
 
     @Test

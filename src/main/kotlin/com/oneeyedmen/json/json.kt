@@ -2,7 +2,7 @@ package com.oneeyedmen.json
 
 fun parse(json: CharSequence): Any? {
     var state: ParseState = TopLevelGround
-    val values = mutableListOf<Any?>()
+    val values = ArrayList<Any?>(1)
     json.forEach { char ->
         state = state.accept(char).also { newState ->
             if (newState != state) {
@@ -15,24 +15,21 @@ fun parse(json: CharSequence): Any? {
     }
     values.addValueFrom(state)
     return when {
-        values.isEmpty() -> throw IllegalArgumentException()
+        values.isEmpty() -> throw IllegalArgumentException("No top-level content found")
+        values.size != 1 -> error("Unexpectedly found more than one top level value")
         else -> values.single()
     }
 }
 
-private fun MutableList<Any?>.addValueFrom(state: ParseState) {
-    (state as? Valued)?.let { add(it.value()) }
+private interface ParseState {
+    fun accept(char: Char): ParseState
 }
 
-interface Valued {
+private interface Valued {
     fun value(): Any?
 }
 
-private abstract class ParseState {
-    abstract fun accept(char: Char): ParseState
-}
-
-private object TopLevelGround : ParseState() {
+private object TopLevelGround : ParseState {
     override fun accept(char: Char): ParseState =
         when {
             char == '"' -> StringState(this, char)
@@ -46,7 +43,7 @@ private object TopLevelGround : ParseState() {
 
 private fun Char.isValidInLiteral() = "nulltruefalse0123456789-+.eE".contains(this)
 
-private object Ground : ParseState() {
+private object Ground : ParseState {
     override fun accept(char: Char): ParseState =
         when {
             char == '"' -> StringState(this, char)
@@ -62,13 +59,13 @@ private object Ground : ParseState() {
 private class Literal(
     val ground: ParseState,
     char: Char
-) : ParseState(), Valued {
+) : ParseState, Valued {
     private val chars = StringBuilder().append(char)
 
     override fun accept(char: Char) = when {
         char == ',' -> ground.accept(char)
         char == ':' -> ground.accept(char)
-        char.isWhitespace() -> ground
+        char.isWhitespace() -> ground.accept(char)
         char.isValidInLiteral() -> {
             chars.append(char)
             this
@@ -84,13 +81,12 @@ private class Literal(
             "false" -> false
             else -> string.toBigDecimalOrNull() ?: throw IllegalArgumentException("Not a literal <$string>")
         }
-
 }
 
 private class StringState(
     val ground: ParseState,
     char: Char
-) : ParseState(), Valued {
+) : ParseState, Valued {
     private val chars = StringBuilder().append(char)
     override fun accept(char: Char): ParseState =
         when (char) {
@@ -117,7 +113,7 @@ private class StringState(
         }
 }
 
-private class ArrayState(val ground: ParseState) : ParseState(), Valued {
+private class ArrayState(val ground: ParseState) : ParseState, Valued {
     private var state: ParseState = ArrayGround
     private val values = mutableListOf<Any?>()
     private var isComplete = false
@@ -150,7 +146,7 @@ private class ArrayState(val ground: ParseState) : ParseState(), Valued {
         else -> values
     }
 
-    private object ArrayGround : ParseState() {
+    private object ArrayGround : ParseState {
         override fun accept(char: Char): ParseState = when {
             char == '"' -> StringState(SeekingComma, char)
             char == '[' -> ArrayState(SeekingComma)
@@ -161,7 +157,7 @@ private class ArrayState(val ground: ParseState) : ParseState(), Valued {
         }
     }
 
-    private object SeekingComma : ParseState() {
+    private object SeekingComma : ParseState {
         override fun accept(char: Char): ParseState = when {
             char == ',' -> ArrayGround
             char.isWhitespace() -> this
@@ -170,47 +166,52 @@ private class ArrayState(val ground: ParseState) : ParseState(), Valued {
     }
 }
 
-private class ObjectState(val ground: ParseState) : ParseState(), Valued {
+private class ObjectState(val ground: ParseState) : ParseState, Valued {
+    private var state: ParseState = Ground
+    private val values = mutableListOf<Any?>()
     private var isComplete = false
-    private var parseState: ParseState = Ground
-    private val states = mutableListOf<ParseState>()
 
     override fun accept(char: Char): ParseState =
         when {
-            char == '}' && (parseState is Ground || parseState is Literal) -> {
+            char == '}' && (state is Ground || state is Literal) -> {
                 isComplete = true
+                values.addValueFrom(state)
                 ground
             }
 
             else -> {
-                parseState = parseState.accept(char)
-                if (states.lastOrNull() != parseState)
-                    states.add(parseState)
+                state = state.accept(char).also { newState ->
+                    if (newState != state) {
+                        values.addValueFrom(state)
+                    }
+                }
                 this
             }
         }
-
 
     override fun value(): Map<String, Any?> =
         when {
             !isComplete -> throw IllegalArgumentException()
             else -> {
-                states
-                    .filterIsInstance<Valued>()
+                values
                     .windowed(2, 2)
-                    .associate { threeStates ->
-                        val key = threeStates[0].value() as String
-                        val value = threeStates[1].value()
+                    .associate { keyAndValue ->
+                        val key = keyAndValue[0] as String
+                        val value = keyAndValue[1]
                         key to value
                     }
             }
         }
 }
 
-private object Colon : ParseState() {
+private object Colon : ParseState {
     override fun accept(char: Char) = Ground.accept(char)
 }
 
-private class Comma(val ground: ParseState) : ParseState() {
+private class Comma(val ground: ParseState) : ParseState {
     override fun accept(char: Char) = ground.accept(char)
+}
+
+private fun MutableList<Any?>.addValueFrom(state: ParseState) {
+    (state as? Valued)?.let { add(it.value()) }
 }
