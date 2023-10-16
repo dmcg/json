@@ -1,7 +1,7 @@
 package com.oneeyedmen.json
 
 fun parse(json: CharSequence): Any? {
-    var state: ParseState = TopLevelGround
+    var state: ParseState = SeekingValue
     val values = ArrayList<Any?>(1)
     json.forEach { char ->
         state = state.accept(char).also { newState ->
@@ -29,7 +29,7 @@ private interface Valued {
     fun value(): Any?
 }
 
-private object TopLevelGround : ParseState {
+private object SeekingValue : ParseState {
     override fun accept(char: Char): ParseState =
         when {
             char == '"' -> StringState(this, char)
@@ -42,19 +42,6 @@ private object TopLevelGround : ParseState {
 }
 
 private fun Char.isValidInLiteral() = "nulltruefalse0123456789-+.eE".contains(this)
-
-private object Ground : ParseState {
-    override fun accept(char: Char): ParseState =
-        when {
-            char == '"' -> StringState(this, char)
-            char == '[' -> ArrayState(this)
-            char == '{' -> ObjectState(this)
-            char == ',' -> Comma(this)
-            char == ':' -> Colon
-            char.isWhitespace() -> this
-            else -> Literal(this, char)
-        }
-}
 
 private class Literal(
     val ground: ParseState,
@@ -114,7 +101,7 @@ private class StringState(
 }
 
 private class ArrayState(val ground: ParseState) : ParseState, Valued {
-    private var state: ParseState = ArrayGround
+    private var state: ParseState = SeekingValue
     private val values = mutableListOf<Any?>()
     private var isComplete = false
 
@@ -139,14 +126,14 @@ private class ArrayState(val ground: ParseState) : ParseState, Valued {
     private fun arrayIsCompletable() =
         state is Literal ||
             state is SeekingComma ||
-            (state is ArrayGround && values.isEmpty())
+            (state is SeekingValue && values.isEmpty())
 
     override fun value(): List<Any?> = when {
         !isComplete -> throw IllegalArgumentException("Unterminated array")
         else -> values
     }
 
-    private object ArrayGround : ParseState {
+    private object SeekingValue : ParseState {
         override fun accept(char: Char): ParseState = when {
             char == '"' -> StringState(SeekingComma, char)
             char == '[' -> ArrayState(SeekingComma)
@@ -159,7 +146,7 @@ private class ArrayState(val ground: ParseState) : ParseState, Valued {
 
     private object SeekingComma : ParseState {
         override fun accept(char: Char): ParseState = when {
-            char == ',' -> ArrayGround
+            char == ',' -> SeekingValue
             char.isWhitespace() -> this
             else -> throw IllegalArgumentException("Expected a comma in an array, got <$char>")
         }
@@ -167,13 +154,13 @@ private class ArrayState(val ground: ParseState) : ParseState, Valued {
 }
 
 private class ObjectState(val ground: ParseState) : ParseState, Valued {
-    private var state: ParseState = Ground
+    private var state: ParseState = SeekingKey
     private val values = mutableListOf<Any?>()
     private var isComplete = false
 
     override fun accept(char: Char): ParseState =
         when {
-            char == '}' && (state is Ground || state is Literal) -> {
+            char == '}' && objectIsCompletable() -> {
                 isComplete = true
                 values.addValueFrom(state)
                 ground
@@ -191,25 +178,61 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
 
     override fun value(): Map<String, Any?> =
         when {
-            !isComplete -> throw IllegalArgumentException()
+            !isComplete -> throw IllegalArgumentException("Unterminated object")
             else -> {
                 values
-                    .windowed(2, 2)
+                    .windowed(2, 2, partialWindows = true)
                     .associate { keyAndValue ->
-                        val key = keyAndValue[0] as String
+                        if (keyAndValue.size != 2)
+                            error("Didn't get both a key and value, only <${keyAndValue[0]}>")
+                        val key = (keyAndValue[0] as? String) ?: error("Key in object <${keyAndValue[0]}> is not a string")
                         val value = keyAndValue[1]
                         key to value
                     }
             }
         }
-}
 
-private object Colon : ParseState {
-    override fun accept(char: Char) = Ground.accept(char)
-}
+    private fun objectIsCompletable() =
+        state is Literal ||
+            state is SeekingComma ||
+            (state is SeekingKey && values.isEmpty())
 
-private class Comma(val ground: ParseState) : ParseState {
-    override fun accept(char: Char) = ground.accept(char)
+    private object SeekingKey : ParseState {
+        override fun accept(char: Char): ParseState =
+            when {
+                char == '"' -> StringState(SeekingColon, char)
+                char.isWhitespace() -> this
+                else -> throw IllegalArgumentException("Expected a string key in object not <$char>")
+            }
+    }
+
+    private object SeekingColon : ParseState {
+        override fun accept(char: Char): ParseState =
+            when {
+                char == ':' -> SeekingValue
+                char.isWhitespace() -> this
+                else -> throw IllegalArgumentException("Expected a colon in object not <$char>")
+            }
+    }
+    private object SeekingValue : ParseState {
+        override fun accept(char: Char): ParseState =
+            when {
+                char == '"' -> StringState(SeekingComma, char)
+                char == '[' -> ArrayState(SeekingComma)
+                char == '{' -> ObjectState(SeekingComma)
+                char.isWhitespace() -> this
+                char.isValidInLiteral() -> Literal(SeekingComma, char)
+                else -> throw IllegalArgumentException("Unexpected character in object <$char>")
+            }
+    }
+    private object SeekingComma : ParseState {
+        override fun accept(char: Char): ParseState =
+            when {
+                char == ',' -> SeekingKey
+                char.isWhitespace() -> this
+                else -> throw IllegalArgumentException("Expected a comma in object not <$char>")
+            }
+    }
 }
 
 private fun MutableList<Any?>.addValueFrom(state: ParseState) {

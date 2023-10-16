@@ -212,8 +212,37 @@ class Json2Tests {
             .isEqualTo(mapOf("aString" to "{hello}", "anArray" to listOf(true, false)))
         expectThat(parse("""{"aString":"{hello}", "anObject" : { "aBoolean" : true}}"""))
             .isEqualTo(mapOf("aString" to "{hello}", "anObject" to mapOf("aBoolean" to true)))
-
     }
+
+    @Test
+    fun `unterminated objects`() {
+        expectThrows<IllegalArgumentException> {
+            parse("{")
+        }.message.isEqualTo("Unterminated object")
+        expectThrows<IllegalArgumentException> {
+            parse("""{ "aString":"banana" """)
+        }.message.isEqualTo("Unterminated object")
+        expectThrows<IllegalArgumentException> {
+            parse("""{ "aString":"banana",""")
+        }.message.isEqualTo("Unterminated object")
+    }
+
+    @Test
+    fun `badly formed objects`() {
+        expectThrows<IllegalArgumentException> {
+            parse("{ true: 42 }")
+        }.message.isEqualTo("Expected a string key in object not <t>")
+        expectThrows<IllegalArgumentException> {
+            parse("""{ "key" 42 }""")
+        }.message.isEqualTo("Expected a colon in object not <4>")
+        expectThrows<IllegalArgumentException> {
+            parse("""{ "key" : }""")
+        }.message.isEqualTo("Unexpected character in object <}>")
+        expectThrows<IllegalArgumentException> {
+            parse("""{ "key" : 42,}""")
+        }.message.isEqualTo("Expected a string key in object not <}>")
+    }
+
 }
 
 
