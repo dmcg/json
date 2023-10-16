@@ -143,7 +143,7 @@ class Json2Tests {
     }
 
     @Test
-    fun `unterminate arrays`() {
+    fun `unterminated arrays`() {
         expectThrows<IllegalArgumentException> {
             parse("[")
         }.message.isEqualTo("Unterminated array")

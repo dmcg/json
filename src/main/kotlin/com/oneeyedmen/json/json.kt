@@ -167,7 +167,6 @@ private class ArrayState(val ground: ParseState) : ParseState(), Valued {
             char.isWhitespace() -> this
             else -> throw IllegalArgumentException("Expected a comma in an array, got <$char>")
         }
-
     }
 }
 
