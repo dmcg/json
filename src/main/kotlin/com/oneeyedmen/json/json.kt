@@ -70,8 +70,6 @@ private class Literal(
         }
 }
 
-private val c = '\u000c'
-
 private class StringState(
     val ground: ParseState,
     char: Char
@@ -90,7 +88,8 @@ private class StringState(
 
     override fun value(): String =
         when {
-            chars.last() != '\"' -> throw IllegalArgumentException()
+            chars.last() != '\"' ->
+                throw IllegalArgumentException("Unterminated string <$chars>")
             else -> chars.substring(1, chars.length - 1)
         }
 

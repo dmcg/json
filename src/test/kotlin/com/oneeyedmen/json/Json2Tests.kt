@@ -32,7 +32,7 @@ class Json2Tests {
         expectThat(parse("""" """")).isEqualTo(" ")
         expectThrows<IllegalArgumentException> {
             parse(""""banana""")
-        }
+        }.message.isEqualTo("Unterminated string <\"banana>")
 
         strings.forEach {
             expectThat(parse(it)).isA<String>()
