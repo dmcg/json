@@ -70,25 +70,20 @@ private class Literal(
         }
 }
 
+private val c = '\u000c'
+
 private class StringState(
     val ground: ParseState,
     char: Char
 ) : ParseState, Valued {
     private val chars = StringBuilder().append(char)
-    override fun accept(char: Char): ParseState =
-        when (char) {
-            '\"' -> {
-                if (chars.endsWith('\\')) {
-                    chars.deleteCharAt(chars.length - 1).append(char)
-                    this
-                } else {
-                    chars.append(char)
-                    ground
-                }
-            }
+    private var state: ParseState = Unescaped()
 
+    override fun accept(char: Char): ParseState =
+        when (val newState = state.accept(char)) {
+            ground -> ground
             else -> {
-                chars.append(char)
+                state = newState
                 this
             }
         }
@@ -98,6 +93,63 @@ private class StringState(
             chars.last() != '\"' -> throw IllegalArgumentException()
             else -> chars.substring(1, chars.length - 1)
         }
+
+    inner class Unescaped : ParseState {
+        override fun accept(char: Char) = when (char) {
+            '\\' -> Escaped()
+            '\"' -> {
+                chars.append(char)
+                ground
+            }
+
+            else -> {
+                chars.append(char)
+                this
+            }
+        }
+    }
+
+    inner class Escaped : ParseState {
+        override fun accept(char: Char) = when (char) {
+            'u' -> Unicode()
+            else -> {
+                when (char) {
+                    '\"' -> chars.append(char)
+                    '\\' -> chars.append(char)
+                    '/' -> chars.append(char)
+                    'b' -> chars.append('\b')
+                    'n' -> chars.append('\n')
+                    'r' -> chars.append('\r')
+                    't' -> chars.append('\t')
+                    'f' -> chars.append('\u000c')
+                    else -> throw IllegalArgumentException("Illegal escape <\\$char>")
+                }
+                Unescaped()
+            }
+        }
+    }
+
+    inner class Unicode : ParseState {
+        val digits = StringBuilder()
+        override fun accept(char: Char) = when (char) {
+            in "0123456789abcdefABCDEF" -> {
+                digits.append(char)
+                if (digits.length == 4) {
+                    chars.append(digits.toChar())
+                    Unescaped()
+                } else this
+            }
+
+            else -> {
+                val escape = if (char == '\"' || char.isWhitespace()) "$digits" else "$digits$char"
+                throw IllegalArgumentException("Illegal unicode escape <\\u$escape>")
+            }
+        }
+    }
+}
+
+private fun java.lang.StringBuilder.toChar(): Char {
+    return this.toString().toInt(16).toChar()
 }
 
 private class ArrayState(val ground: ParseState) : ParseState, Valued {
@@ -185,7 +237,8 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
                     .associate { keyAndValue ->
                         if (keyAndValue.size != 2)
                             error("Didn't get both a key and value, only <${keyAndValue[0]}>")
-                        val key = (keyAndValue[0] as? String) ?: error("Key in object <${keyAndValue[0]}> is not a string")
+                        val key =
+                            (keyAndValue[0] as? String) ?: error("Key in object <${keyAndValue[0]}> is not a string")
                         val value = keyAndValue[1]
                         key to value
                     }
@@ -214,6 +267,7 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
                 else -> throw IllegalArgumentException("Expected a colon in object not <$char>")
             }
     }
+
     private object SeekingValue : ParseState {
         override fun accept(char: Char): ParseState =
             when {
@@ -225,6 +279,7 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
                 else -> throw IllegalArgumentException("Unexpected character in object <$char>")
             }
     }
+
     private object SeekingComma : ParseState {
         override fun accept(char: Char): ParseState =
             when {

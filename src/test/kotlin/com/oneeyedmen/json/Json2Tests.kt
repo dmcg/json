@@ -30,7 +30,6 @@ class Json2Tests {
         expectThat(parse("""  "banana" """)).isEqualTo("banana")
         expectThat(parse(""""Hello world"""")).isEqualTo("Hello world")
         expectThat(parse("""" """")).isEqualTo(" ")
-        expectThat(parse(""""Hello \"world"""")).isEqualTo("Hello \"world")
         expectThrows<IllegalArgumentException> {
             parse(""""banana""")
         }
@@ -38,6 +37,36 @@ class Json2Tests {
         strings.forEach {
             expectThat(parse(it)).isA<String>()
         }
+    }
+
+    @Test
+    fun `string escapes`() {
+        expectThat(parse(""""Hello \"world"""")).isEqualTo("Hello \"world")
+        expectThat(parse(""""Hello \\world"""")).isEqualTo("Hello \\world")
+        expectThat(parse(""""Hello \/world"""")).isEqualTo("Hello /world")
+        expectThat(parse(""""Hello \bworld"""")).isEqualTo("Hello \bworld")
+        expectThat(parse(""""Hello \nworld"""")).isEqualTo("Hello \nworld")
+        expectThat(parse(""""Hello \rworld"""")).isEqualTo("Hello \rworld")
+        expectThat(parse(""""Hello \tworld"""")).isEqualTo("Hello \tworld")
+        expectThat(parse(""""Hello \fworld"""")).isEqualTo("Hello \u000Cworld")
+        expectThrows<IllegalArgumentException> {
+            parse(""""Hello \xworld"""")
+        }.message.isEqualTo("Illegal escape <\\x>")
+
+        expectThat(parse(""""Hello \u000Cworld"""")).isEqualTo("Hello \u000Cworld")
+        expectThat(parse(""""Hello \u9999world"""")).isEqualTo("Hello \u9999world")
+        expectThrows<IllegalArgumentException> {
+            parse(""""Hello \ux world"""")
+        }.message.isEqualTo("Illegal unicode escape <\\ux>")
+        expectThrows<IllegalArgumentException> {
+            parse(""""Hello \u9x world"""")
+        }.message.isEqualTo("Illegal unicode escape <\\u9x>")
+        expectThrows<IllegalArgumentException> {
+            parse(""""Hello \u987 world"""")
+        }.message.isEqualTo("Illegal unicode escape <\\u987>")
+        expectThrows<IllegalArgumentException> {
+            parse(""""Hello \u987"""")
+        }.message.isEqualTo("Illegal unicode escape <\\u987>")
     }
 
     @Test
