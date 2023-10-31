@@ -35,7 +35,7 @@ private object SeekingValue : ParseState {
             char == '"' -> StringState(this, char)
             char == '[' -> ArrayState(this)
             char == '{' -> ObjectState(this)
-            char.isWhitespace() -> this
+            char.isJSONWhitespace() -> this
             char.isValidInLiteral() -> Literal(this, char)
             else -> throw IllegalArgumentException("Not a valid top-level character <$char>")
         }
@@ -52,7 +52,7 @@ private class Literal(
     override fun accept(char: Char) = when {
         char == ',' -> ground.accept(char)
         char == ':' -> ground.accept(char)
-        char.isWhitespace() -> ground.accept(char)
+        char.isJSONWhitespace() -> ground.accept(char)
         char.isValidInLiteral() -> {
             chars.append(char)
             this
@@ -66,9 +66,15 @@ private class Literal(
             "null" -> null
             "true" -> true
             "false" -> false
-            else -> string.toBigDecimalOrNull() ?: throw IllegalArgumentException("Not a literal <$string>")
+            else -> if (string.matches(numberRegex))
+                string.toBigDecimalOrNull() ?: throw IllegalArgumentException("Not a literal <$string>")
+            else
+                throw IllegalArgumentException("Not a valid number <$string>")
         }
+
 }
+
+private val numberRegex = """^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$""".toRegex()
 
 private class StringState(
     val ground: ParseState,
@@ -90,6 +96,7 @@ private class StringState(
         when {
             chars.last() != '\"' ->
                 throw IllegalArgumentException("Unterminated string <$chars>")
+
             else -> chars.substring(1, chars.length - 1)
         }
 
@@ -102,6 +109,7 @@ private class StringState(
             }
 
             else -> {
+                if (char.isJSONControlCharacter()) throw IllegalArgumentException("Illegal character with code <${char.code}> in string")
                 chars.append(char)
                 this
             }
@@ -140,16 +148,16 @@ private class StringState(
             }
 
             else -> {
-                val escape = if (char == '\"' || char.isWhitespace()) "$digits" else "$digits$char"
+                val escape = if (char == '\"' || char.isJSONWhitespace()) "$digits" else "$digits$char"
                 throw IllegalArgumentException("Illegal unicode escape <\\u$escape>")
             }
         }
     }
 }
 
-private fun java.lang.StringBuilder.toChar(): Char {
-    return this.toString().toInt(16).toChar()
-}
+private fun Char.isJSONControlCharacter() = this in '\u0000'..'\u001f'
+
+private fun StringBuilder.toChar(): Char = this.toString().toInt(16).toChar()
 
 private class ArrayState(val ground: ParseState) : ParseState, Valued {
     private var state: ParseState = SeekingValue
@@ -189,7 +197,7 @@ private class ArrayState(val ground: ParseState) : ParseState, Valued {
             char == '"' -> StringState(SeekingComma, char)
             char == '[' -> ArrayState(SeekingComma)
             char == '{' -> ObjectState(SeekingComma)
-            char.isWhitespace() -> this
+            char.isJSONWhitespace() -> this
             char.isValidInLiteral() -> Literal(SeekingComma, char)
             else -> throw IllegalArgumentException("Unexpected character in array <$char>")
         }
@@ -198,7 +206,7 @@ private class ArrayState(val ground: ParseState) : ParseState, Valued {
     private object SeekingComma : ParseState {
         override fun accept(char: Char): ParseState = when {
             char == ',' -> SeekingValue
-            char.isWhitespace() -> this
+            char.isJSONWhitespace() -> this
             else -> throw IllegalArgumentException("Expected a comma in an array, got <$char>")
         }
     }
@@ -253,7 +261,7 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
         override fun accept(char: Char): ParseState =
             when {
                 char == '"' -> StringState(SeekingColon, char)
-                char.isWhitespace() -> this
+                char.isJSONWhitespace() -> this
                 else -> throw IllegalArgumentException("Expected a string key in object not <$char>")
             }
     }
@@ -262,7 +270,7 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
         override fun accept(char: Char): ParseState =
             when {
                 char == ':' -> SeekingValue
-                char.isWhitespace() -> this
+                char.isJSONWhitespace() -> this
                 else -> throw IllegalArgumentException("Expected a colon in object not <$char>")
             }
     }
@@ -273,7 +281,7 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
                 char == '"' -> StringState(SeekingComma, char)
                 char == '[' -> ArrayState(SeekingComma)
                 char == '{' -> ObjectState(SeekingComma)
-                char.isWhitespace() -> this
+                char.isJSONWhitespace() -> this
                 char.isValidInLiteral() -> Literal(SeekingComma, char)
                 else -> throw IllegalArgumentException("Unexpected character in object <$char>")
             }
@@ -283,7 +291,7 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
         override fun accept(char: Char): ParseState =
             when {
                 char == ',' -> SeekingKey
-                char.isWhitespace() -> this
+                char.isJSONWhitespace() -> this
                 else -> throw IllegalArgumentException("Expected a comma in object not <$char>")
             }
     }
@@ -292,3 +300,5 @@ private class ObjectState(val ground: ParseState) : ParseState, Valued {
 private fun MutableList<Any?>.addValueFrom(state: ParseState) {
     (state as? Valued)?.let { add(it.value()) }
 }
+
+private fun Char.isJSONWhitespace() = this == '\u0020' || this == '\u0009' || this == '\u000A' || this == '\u000D'

@@ -67,6 +67,15 @@ class Json2Tests {
         expectThrows<IllegalArgumentException> {
             parse(""""Hello \u987"""")
         }.message.isEqualTo("Illegal unicode escape <\\u987>")
+        expectThrows<IllegalArgumentException> {
+            parse("\"\u0000\"")
+        }.message.isEqualTo("Illegal character with code <0> in string")
+        expectThrows<IllegalArgumentException> {
+            parse("\"\u001f\"")
+        }.message.isEqualTo("Illegal character with code <31> in string")
+        expectThrows<IllegalArgumentException> {
+            parse("\"\n\"")
+        }.message.isEqualTo("Illegal character with code <10> in string")
     }
 
     @Test
@@ -97,6 +106,10 @@ class Json2Tests {
         expectThat(parse("12.34")).isEqualTo(BigDecimal("12.34"))
         expectThat(parse("12.34E5")).isEqualTo(BigDecimal("12.34E5"))
         expectThat(parse("-12.34")).isEqualTo((BigDecimal("-12.34")))
+
+        expectThrows<IllegalArgumentException>{
+            parse("-.0")
+        }.message.isEqualTo("Not a valid number <-.0>")
 
         numbers.forEach {
             expectThat(parse(it)).isA<BigDecimal>()
