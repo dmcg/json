@@ -66,14 +66,25 @@ private class Literal(
             "null" -> null
             "true" -> true
             "false" -> false
-            else -> if (string.matches(numberRegex))
+            in intRegex ->
+                string.toLongOrNull()?.toIntOrLong()
+                    ?: string.toBigIntegerOrNull()
+                    ?: error("Can't make an integer thing out of <$string>")
+            in numberRegex ->
                 string.toBigDecimalOrNull() ?: throw IllegalArgumentException("Not a literal <$string>")
-            else
+            else ->
                 throw IllegalArgumentException("Not a valid number <$string>")
         }
 
 }
 
+private fun Long.toIntOrLong(): Number = when {
+    this > Int.MAX_VALUE || this < Int.MIN_VALUE -> this
+    else -> this.toInt()
+}
+
+private operator fun Regex.contains(text: CharSequence): Boolean = this.matches(text)
+private val intRegex = """-?(0|[1-9]\d*)""".toRegex()
 private val numberRegex = """^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$""".toRegex()
 
 private class StringState(

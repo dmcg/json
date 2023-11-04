@@ -12,6 +12,7 @@ repositories {
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation("io.strikt:strikt-core:0.34.0")
+    testImplementation("com.fasterxml.jackson.core:jackson-databind:2.15.3")
 }
 
 tasks.test {

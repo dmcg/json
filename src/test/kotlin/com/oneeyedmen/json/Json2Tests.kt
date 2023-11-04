@@ -7,6 +7,7 @@ import strikt.assertions.isA
 import strikt.assertions.isEqualTo
 import strikt.assertions.message
 import java.math.BigDecimal
+import java.math.BigInteger
 
 class Json2Tests {
     @Test
@@ -100,19 +101,43 @@ class Json2Tests {
 
     @Test
     fun numbers() {
-        expectThat(parse("42")).isEqualTo(BigDecimal("42"))
-        expectThat(parse(" 42")).isEqualTo(BigDecimal("42"))
-        expectThat(parse(" 42  ")).isEqualTo(BigDecimal("42"))
+        expectThat(parse("42")).isEqualTo(42)
+        expectThat(parse(" 42")).isEqualTo(42)
+        expectThat(parse(" 42  ")).isEqualTo(42)
+
+        expectThat(parse("${Int.MAX_VALUE}")).isA<Int>()isEqualTo(Int.MAX_VALUE)
+        expectThat(parse("${Int.MIN_VALUE}")).isA<Int>()isEqualTo(Int.MIN_VALUE)
+
+        val biggerThanAnInt: Long = Int.MAX_VALUE.toLong() + 1
+        expectThat(parse("$biggerThanAnInt")).isA<Long>().isEqualTo(biggerThanAnInt)
+
+        val smallerThanInInt: Long = Int.MIN_VALUE.toLong() - 1
+        expectThat(parse("$smallerThanInInt")).isA<Long>().isEqualTo(smallerThanInInt)
+
+        val biggerThanALong : BigInteger = BigInteger.valueOf(Long.MAX_VALUE) + BigInteger.valueOf(1)
+        expectThat(parse("$biggerThanALong")).isA<BigInteger>().isEqualTo(biggerThanALong)
+
+        val smallerThanALong : BigInteger = BigInteger.valueOf(Long.MIN_VALUE) + BigInteger.valueOf(-11)
+        expectThat(parse("$smallerThanALong")).isA<BigInteger>().isEqualTo(smallerThanALong)
+
+        expectThat(parse("0")).isA<Int>().isEqualTo(0)
+        expectThat(parse("0.0")).isA<BigDecimal>().isEqualTo(0.0.toBigDecimal())
+
+        expectThat(parse("1E2")).isEqualTo(BigDecimal("1E2"))
+
         expectThat(parse("12.34")).isEqualTo(BigDecimal("12.34"))
         expectThat(parse("12.34E5")).isEqualTo(BigDecimal("12.34E5"))
         expectThat(parse("-12.34")).isEqualTo((BigDecimal("-12.34")))
 
         expectThrows<IllegalArgumentException>{
+            parse("042")
+        }.message.isEqualTo("Not a valid number <042>")
+        expectThrows<IllegalArgumentException>{
             parse("-.0")
         }.message.isEqualTo("Not a valid number <-.0>")
 
         numbers.forEach {
-            expectThat(parse(it)).isA<BigDecimal>()
+            expectThat(parse(it)).isA<Number>()
         }
     }
 
