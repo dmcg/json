@@ -10,7 +10,7 @@ import java.io.File
 @Disabled
 class JSONTestSuitesTests {
 
-    val dir = File("../JSONTestSuite/test_parsing")
+    val dir = File("src/test/resources/test_parsing")
 
     @Test
     fun test() {

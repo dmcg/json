@@ -40,3 +40,4 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+/src/test/resources/test_parsing/
