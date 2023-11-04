@@ -17,15 +17,18 @@ class JSONTestSuitesTests {
 
     @Test
     fun test() {
-        val results = dir.listFiles()!!.filterNot { file -> file.name == "n_structure_100000_opening_arrays.json" }
+        val results = dir.listFiles()!!
+            .filterNot { it.name == "n_structure_100000_opening_arrays.json" }
             .map { file ->
-                testInfo(file)
+                runTestFor(file)
             }
-        results.sortedBy { testInfo -> testInfo.file.name.split('_')[1] }
-            .sortedByDescending { testInfo -> testInfo.status }.forEach { testInfo ->
+        results
+            .sortedBy { testInfo -> testInfo.file.name.split('_')[1] }
+            .sortedByDescending { testInfo -> testInfo.status }
+            .forEach { testInfo ->
                 println(testInfo.toString())
             }
-        expectThat(results).none { get {status}.isEqualTo(FAIL) }
+        expectThat(results).none { get { status }.isEqualTo(FAIL) }
     }
 
 
@@ -40,7 +43,7 @@ class JSONTestSuitesTests {
     }
 }
 
-private fun testInfo(file: File): TestInfo {
+private fun runTestFor(file: File): TestInfo {
     val contents = file.readText(Charsets.UTF_8)
     return try {
         val result = parse(contents)
@@ -54,11 +57,11 @@ private fun testInfo(file: File): TestInfo {
 }
 
 
-enum class Status {
+private enum class Status {
     PASS, FAIL
 }
 
-data class TestInfo(
+private data class TestInfo(
     val file: File,
     val contents: String,
     val status: Status,
