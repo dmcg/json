@@ -4,7 +4,10 @@ import com.oneeyedmen.json.Status.FAIL
 import com.oneeyedmen.json.Status.PASS
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import strikt.api.expectThat
 import strikt.api.expectThrows
+import strikt.assertions.isEqualTo
+import strikt.assertions.none
 import java.io.File
 
 @Disabled
@@ -14,19 +17,21 @@ class JSONTestSuitesTests {
 
     @Test
     fun test() {
-        dir.listFiles().filterNot { file -> file.name == "n_structure_100000_opening_arrays.json" }
+        val results = dir.listFiles()!!.filterNot { file -> file.name == "n_structure_100000_opening_arrays.json" }
             .map { file ->
                 testInfo(file)
-            }.sortedBy { testInfo -> testInfo.file.name.split('_')[1] }
+            }
+        results.sortedBy { testInfo -> testInfo.file.name.split('_')[1] }
             .sortedByDescending { testInfo -> testInfo.status }.forEach { testInfo ->
                 println(testInfo.toString())
             }
+        expectThat(results).none { get {status}.isEqualTo(FAIL) }
     }
 
 
     @Disabled("We fail with StackOverflowError not IllegalArgumentException")
     @Test
-    fun `n_structure_100000_opening_arrays`() {
+    fun n_structure_100000_opening_arrays() {
         val file = File(dir, "n_structure_100000_opening_arrays.json")
         val contents = file.readText(Charsets.UTF_8)
         expectThrows<IllegalArgumentException> {
