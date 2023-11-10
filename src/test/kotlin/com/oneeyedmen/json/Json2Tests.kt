@@ -105,8 +105,8 @@ class Json2Tests {
         expectThat(parse(" 42")).isEqualTo(42)
         expectThat(parse(" 42  ")).isEqualTo(42)
 
-        expectThat(parse("${Int.MAX_VALUE}")).isA<Int>()isEqualTo(Int.MAX_VALUE)
-        expectThat(parse("${Int.MIN_VALUE}")).isA<Int>()isEqualTo(Int.MIN_VALUE)
+        expectThat(parse("${Int.MAX_VALUE}")).isA<Int>().isEqualTo(Int.MAX_VALUE)
+        expectThat(parse("${Int.MIN_VALUE}")).isA<Int>().isEqualTo(Int.MIN_VALUE)
 
         val biggerThanAnInt: Long = Int.MAX_VALUE.toLong() + 1
         expectThat(parse("$biggerThanAnInt")).isA<Long>().isEqualTo(biggerThanAnInt)
